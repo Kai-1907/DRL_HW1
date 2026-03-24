@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RL Gridworld HW1</title>
+    <style>
+        /* 基礎樣式 */
+        .grid-container {
+            display: grid;
+            gap: 5px;
+            margin: 20px 0;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        /* 狀態顏色 */
+        .start {
+            background-color: #28a745;
+            color: white;
+        }
+
+        /* 綠 */
+        .end {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        /* 紅 */
+        .wall {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        /* 灰 */
+        .value {
+            font-weight: bold;
+            color: blue;
+        }
+
+        .arrow {
+            font-size: 20px;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>HW1: 網格地圖與強化學習</h1>
+
+    <div>
+        尺寸 n (5-9): <input type="number" id="nSize" value="5" min="5" max="9">
+        <button onclick="createGrid()">1. 生成地圖</button>
+        <button onclick="calculate('evaluate')">2. 執行隨機策略評估 (HW1-2)</button>
+        <button onclick="calculate('calculate')">3. 執行價值迭代 (HW1-3)</button>
+    </div>
+
+    <div id="grid" class="grid-container"></div>
+
+    <script>
+        let n = 5;
+        let startPos = null;
+        let endPos = null;
+        let obstacles = [];
+
+        // 生成網格
+        function createGrid() {
+            n = parseInt(document.getElementById('nSize').value);
+            const gridDiv = document.getElementById('grid');
+            gridDiv.innerHTML = '';
+            gridDiv.style.gridTemplateColumns = `repeat(${n}, 65px)`;
+
+            startPos = null; endPos = null; obstacles = []; // 重置
+
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${r}-${c}`;
+                    cell.onclick = () => handleCellClick(r, c, cell);
+                    gridDiv.appendChild(cell);
+                }
+            }
+        }
+
+        // 處理點擊事件 (起點 -> 終點 -> 障礙物)
+        function handleCellClick(r, c, cell) {
+            if (!startPos) {
+                startPos = [r, c];
+                cell.classList.add('start');
+                cell.innerHTML = 'START';
+            } else if (!endPos) {
+                if (r === startPos[0] && c === startPos[1]) return;
+                endPos = [r, c];
+                cell.classList.add('end');
+                cell.innerHTML = 'END';
+            } else {
+                if (cell.classList.contains('start') || cell.classList.contains('end')) return;
+                cell.classList.toggle('wall');
+                // 更新障礙物清單
+                const obsKey = JSON.stringify([r, c]);
+                const idx = obstacles.findIndex(o => JSON.stringify(o) === obsKey);
+                if (idx > -1) obstacles.splice(idx, 1);
+                else obstacles.push([r, c]);
+            }
+        }
+
+        // fetch
+        function calculate(mode) { // 核心修正：接收 mode 參數
+            if (!startPos || !endPos) {
+                alert("請先設定起點與終點！");
+                return;
+            }
+
+            const endpoint = mode === 'evaluate' ? '/evaluate' : '/calculate';
+
+            // 核心修正：因為 obstacles 已經是 [[r,c], [r,c]] 格式，直接傳送即可
+            const obstacleArray = obstacles;
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    n: n,
+                    start: startPos,
+                    end: endPos,
+                    obstacles: obstacleArray
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const vMatrix = data.v_matrix;
+                    const policy = data.policy;
+
+                    for (let r = 0; r < n; r++) {
+                        for (let c = 0; c < n; c++) {
+                            const cell = document.getElementById(`cell-${r}-${c}`);
+                            if (!cell) continue;
+
+                            const val = vMatrix[r][c].toFixed(2);
+                            const arrow = policy[`${r}-${c}`] || '';
+
+                            // 核心修正：判斷障礙物格子，使用 JSON.stringify 比較陣列內容
+                            const isObstacle = obstacles.some(o => o[0] === r && o[1] === c);
+
+                            if (arrow === 'END') {
+                                cell.innerHTML = `END<br><span class="value">${val}</span>`;
+                            } else if (isObstacle) {
+                                cell.innerHTML = `<span class="value">${val}</span>`;
+                            } else {
+                                cell.innerHTML = `<span class="arrow">${arrow}</span><br><span class="value">${val}</span>`;
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error("Error:", err));
+        }
+
+    </script>
+</body>
+
+</html>
