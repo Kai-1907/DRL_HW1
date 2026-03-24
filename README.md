@@ -32,6 +32,7 @@
    ```
 3. **開啟網頁**：
    在瀏覽器中訪問 `http://127.0.0.1:5000`。
+   (也可以使用render進行demo:https://drl-hw1-75wv.onrender.com)
 
 ## 📁 專案架構
 app.py: Flask Web 伺服器，處理前端請求與 API 銜接。
